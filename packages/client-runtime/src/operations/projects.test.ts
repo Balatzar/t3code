@@ -9,6 +9,8 @@ import {
 import * as Option from "effect/Option";
 
 import {
+  addProjectRemoteSourceLabel,
+  addProjectRemoteSourcePathHint,
   buildAddProjectRemoteSourceReadiness,
   buildProjectCreateCommand,
   canCreateProjectInEnvironment,
@@ -19,6 +21,7 @@ import {
   getCloneDirectoryName,
   getDefaultCloneUrl,
   normalizePastedCloneUrl,
+  parseAddProjectRemoteSource,
   resolveAddProjectPath,
   sortAddProjectProviderSources,
 } from "./projects.ts";
@@ -219,10 +222,24 @@ describe("add project shared logic", () => {
     };
 
     const readiness = buildAddProjectRemoteSourceReadiness(discovery);
-    expect(readiness.url.ready).toBe(true);
-    expect(readiness.github.ready).toBe(true);
-    expect(readiness.gitlab).toEqual({ ready: false, hint: "Run glab auth login" });
-    expect(sortAddProjectProviderSources(readiness)[0]).toBe("github");
+    expect(readiness("url").ready).toBe(true);
+    expect(readiness(SourceControlProviderKind.make("github")).ready).toBe(true);
+    expect(readiness(SourceControlProviderKind.make("gitlab"))).toEqual({
+      ready: false,
+      hint: "Run glab auth login",
+    });
+    expect(readiness(SourceControlProviderKind.make("bitbucket"))).toEqual({
+      ready: false,
+      hint: "Provider status unavailable. Open Source Control settings and rescan.",
+    });
+    expect(sortAddProjectProviderSources(readiness)).toEqual([
+      "github",
+      "azure-devops",
+      "bitbucket",
+      "forgejo",
+      "gitcafe",
+      "gitlab",
+    ]);
   });
 
   it("finds existing projects by normalized path in the target environment", () => {
@@ -274,5 +291,37 @@ describe("add project shared logic", () => {
       createWorkspaceRootIfMissing: true,
       defaultModelSelection: null,
     });
+  });
+});
+
+describe("add project remote sources", () => {
+  it("labels each host the way the clone picker always has", () => {
+    const sources = ["url", "github", "gitlab", "forgejo", "bitbucket", "azure-devops"] as const;
+    const asSource = (source: (typeof sources)[number]) =>
+      source === "url" ? source : SourceControlProviderKind.make(source);
+    expect(sources.map((source) => addProjectRemoteSourceLabel(asSource(source)))).toEqual([
+      "Git URL",
+      "GitHub",
+      "GitLab",
+      "Forgejo / Gitea",
+      "Bitbucket",
+      "Azure DevOps",
+    ]);
+    expect(sources.map((source) => addProjectRemoteSourcePathHint(asSource(source)))).toEqual([
+      "URL",
+      "owner/repo",
+      "group/project",
+      "owner/repo",
+      "workspace/repository",
+      "project/repository",
+    ]);
+  });
+
+  it("reads route sources for shipped hosts only", () => {
+    expect(parseAddProjectRemoteSource("gitlab")).toBe("gitlab");
+    expect(parseAddProjectRemoteSource("url")).toBe("url");
+    expect(parseAddProjectRemoteSource("gitcafe")).toBe("gitcafe");
+    expect(parseAddProjectRemoteSource("forkhost")).toBe("url");
+    expect(parseAddProjectRemoteSource(null)).toBe("url");
   });
 });
