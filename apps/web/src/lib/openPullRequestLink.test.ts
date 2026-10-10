@@ -370,6 +370,13 @@ describe("findProjectOnChangeRequestHost", () => {
         repository: "org-a/other-project/_git/web",
       }),
     ).toBeUndefined();
+    // Not even another checkout of the same organisation lends its credentials.
+    expect(
+      findProjectOnChangeRequestHost([checkout, backend], {
+        ...reference,
+        repository: "org-a/project/_git/other",
+      }),
+    ).toBeUndefined();
   });
 
   it("prefers the project checked out from the link's own repository", () => {

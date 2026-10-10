@@ -4,13 +4,19 @@
  * @module source-control-bitbucket/client/definition
  */
 import { SourceControlProviderKind } from "@t3tools/contracts";
-import { defineSourceControlClient } from "@t3tools/source-control-core/client/definition";
+import {
+  defineSourceControlClient,
+  isChangeRequestInProjectRepository,
+  isChangeRequestOnProjectHost,
+} from "@t3tools/source-control-core/client/definition";
 
 const safeShellArgument = /^[A-Za-z0-9._/@+=,-]+$/;
 const repositoryName = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
+const KIND = SourceControlProviderKind.make("bitbucket");
+
 export const definition = defineSourceControlClient({
-  kind: SourceControlProviderKind.make("bitbucket"),
+  kind: KIND,
   label: "Bitbucket",
   pickerLabel: "Bitbucket",
   icon: "bitbucket",
@@ -32,5 +38,14 @@ export const definition = defineSourceControlClient({
   authorProfileUrl: () => null,
   referenceAutolinkRepositoryUrl: () => null,
   reviewSummaryRequired: () => false,
+  // No checkout CLI, and the reference field never accepted Bitbucket URLs.
+  checkoutCommandArgument: () => null,
+  isChangeRequestReference: () => false,
+  changeRequestUrlHost: (url) => url.hostname,
+  checkoutChangeRequestHost: () => null,
+  isChangeRequestInRepository: (identity, link) =>
+    isChangeRequestInProjectRepository(KIND, identity, link),
+  canReadChangeRequestOnHost: (identity, link) =>
+    isChangeRequestOnProjectHost(KIND, identity, link),
   isChangeRequestUrl: (url) => url.includes("/pull-requests/"),
 });

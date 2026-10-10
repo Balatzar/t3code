@@ -145,3 +145,103 @@ describe("change request URLs", () => {
     );
   });
 });
+
+describe("reference parsing", () => {
+  const argument = (kind: string, input: string) =>
+    sourceControlClients.get(kind).checkoutCommandArgument(input);
+
+  it("reads each host's checkout command for its argument", () => {
+    expect(argument("github", "gh pr checkout #7")).toBe("#7");
+    expect(argument("gitlab", "glab mr checkout 5")).toBe("5");
+    expect(argument("forgejo", "tea pulls checkout 4")).toBe("4");
+    expect(argument("azure-devops", "az repos pr checkout --remote-name origin -i 9")).toBe("9");
+    expect(argument("azure-devops", "az repos pr checkout --id=11")).toBe("11");
+    expect(argument("github", "glab mr checkout 5")).toBeNull();
+    expect(argument("bitbucket", "gh pr checkout 5")).toBeNull();
+  });
+
+  it("accepts only each host's own change request URLs as references", () => {
+    const accepts = (kind: string, url: string) =>
+      sourceControlClients.get(kind).isChangeRequestReference(url);
+    expect(accepts("github", "https://github.com/a/b/pull/1")).toBe(true);
+    expect(accepts("github", "https://ghe.example/a/b/pull/1")).toBe(false);
+    expect(accepts("gitlab", "https://gl.gitlab.example/g/p/-/merge_requests/3")).toBe(true);
+    expect(accepts("forgejo", "http://forge.local:3000/a/b/pulls/2")).toBe(true);
+    expect(accepts("azure-devops", "https://o.visualstudio.com/p/_git/r/pullrequest/5")).toBe(true);
+    expect(accepts("azure-devops", "https://dev.azure.com/o/p/r/pullrequest/5")).toBe(false);
+  });
+});
+
+describe("project matching", () => {
+  const identity = (canonicalKey: string, extra: object = {}) => ({
+    canonicalKey,
+    locator: {
+      source: "git-remote" as const,
+      remoteName: "origin",
+      remoteUrl: `git@${canonicalKey}.git`,
+    },
+    ...extra,
+  });
+
+  it("matches a link to its repository by full path and host", () => {
+    const gitlab = sourceControlClients.get("gitlab");
+    const checkout = identity("gitlab.com/group/sub/web", { displayName: "group/sub/web" });
+    const link = { host: "gitlab.com", repository: "group/sub/web", number: 1 };
+    expect(gitlab.isChangeRequestInRepository(checkout, link)).toBe(true);
+    expect(gitlab.isChangeRequestInRepository(checkout, { ...link, host: "gitlab.example" })).toBe(
+      false,
+    );
+    expect(gitlab.canReadChangeRequestOnHost(checkout, { ...link, repository: "other/x" })).toBe(
+      true,
+    );
+  });
+
+  it("keeps Forgejo servers on one hostname apart by port and mount path", () => {
+    const forgejo = sourceControlClients.get("forgejo");
+    const mounted = identity("forge.example/acme/web", {
+      webUrl: "https://forge.example:3000/git/acme/web",
+      locator: {
+        source: "git-remote" as const,
+        remoteName: "origin",
+        remoteUrl: "https://forge.example:3000/git/acme/web.git",
+      },
+    });
+    const link = {
+      host: "forge.example",
+      authority: "forge.example:3000",
+      repository: "git/acme/web",
+      number: 1,
+    };
+    expect(forgejo.isChangeRequestInRepository(mounted, link)).toBe(true);
+    expect(
+      forgejo.isChangeRequestInRepository(mounted, { ...link, authority: "forge.example:4000" }),
+    ).toBe(false);
+    expect(
+      forgejo.canReadChangeRequestOnHost(mounted, { ...link, repository: "git/other/x" }),
+    ).toBe(true);
+    expect(
+      forgejo.canReadChangeRequestOnHost(mounted, { ...link, repository: "elsewhere/x/y" }),
+    ).toBe(false);
+    expect(forgejo.changeRequestUrlHost(new URL("https://forge.example:3000/a/b/pulls/1"))).toBe(
+      "forge.example:3000",
+    );
+  });
+
+  it("matches Azure across URL spellings and never lends host-wide reads", () => {
+    const azure = sourceControlClients.get("azure-devops");
+    const checkout = identity("ssh.dev.azure.com/v3/org/project/web");
+    const link = { host: "dev.azure.com", repository: "org/project/_git/web", number: 1 };
+    expect(azure.isChangeRequestInRepository(checkout, link)).toBe(true);
+    expect(azure.canReadChangeRequestOnHost(checkout, link)).toBe(false);
+    expect(azure.checkoutChangeRequestHost(checkout)).toBeNull();
+  });
+
+  it("fills in a missing host from a GitHub checkout only", () => {
+    expect(
+      sourceControlClients.get("github").checkoutChangeRequestHost(identity("ghe.example/a/b")),
+    ).toBe("ghe.example");
+    expect(
+      sourceControlClients.get("gitlab").checkoutChangeRequestHost(identity("gitlab.com/a/b")),
+    ).toBeNull();
+  });
+});
