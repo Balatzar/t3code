@@ -3,6 +3,8 @@ import type { EnvironmentId, ProjectId, PullRequestListEntry } from "@t3tools/co
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  pullRequestHostActions,
+  pullRequestQuickActions,
   filterPullRequestsByInvolvement,
   findScopedProject,
   mergePullRequestLists,
@@ -1718,5 +1720,61 @@ describe("pull request list override settlement", () => {
     const swapped = reusePullRequestEntries(previous, [entry(2, "open"), entry(1, "open")], key);
     expect(swapped).not.toBe(previous);
     expect(swapped.map((row) => row.number)).toEqual([2, 1]);
+  });
+});
+
+describe("pull request quick actions", () => {
+  const summary = (host: string, kind: string, actions?: ReadonlyArray<string>) => ({
+    host,
+    kind: SourceControlProviderKind.make(kind),
+    searchesOnHost: true,
+    projectCount: 1,
+    configured: true,
+    detail: null,
+    ...(actions === undefined ? {} : { actions: actions as never }),
+  });
+
+  it("offers each host what it reports, by host", () => {
+    const actionsOf = pullRequestHostActions([
+      summary("bitbucket.org", "bitbucket", ["merge", "close"]),
+      summary("gitlab.example", "gitlab", ["merge", "ready", "close", "reopen"]),
+    ]);
+    const bitbucket = actionsOf({
+      host: "Bitbucket.org",
+      provider: SourceControlProviderKind.make("bitbucket"),
+    });
+    expect(pullRequestQuickActions({ state: "open", isDraft: false }, bitbucket)).toEqual([
+      "close",
+      "merge",
+    ]);
+    // Bitbucket cannot reopen or mark ready, so those rows offer only what it can do.
+    expect(pullRequestQuickActions({ state: "closed", isDraft: false }, bitbucket)).toEqual([]);
+    expect(pullRequestQuickActions({ state: "open", isDraft: true }, bitbucket)).toEqual(["close"]);
+    const gitlab = actionsOf({
+      host: "gitlab.example",
+      provider: SourceControlProviderKind.make("gitlab"),
+    });
+    expect(pullRequestQuickActions({ state: "closed", isDraft: false }, gitlab)).toEqual([
+      "reopen",
+    ]);
+    expect(pullRequestQuickActions({ state: "merged", isDraft: false }, gitlab)).toEqual([]);
+  });
+
+  it("keeps GitHub-only quick actions for servers that report no actions", () => {
+    const actionsOf = pullRequestHostActions([
+      summary("github.com", "github"),
+      summary("gitlab.com", "gitlab"),
+    ]);
+    const github = actionsOf({
+      host: "github.com",
+      provider: SourceControlProviderKind.make("github"),
+    });
+    expect(pullRequestQuickActions({ state: "open", isDraft: true }, github)).toEqual([
+      "close",
+      "ready",
+    ]);
+    expect(
+      actionsOf({ host: "gitlab.com", provider: SourceControlProviderKind.make("gitlab") }).size,
+    ).toBe(0);
   });
 });

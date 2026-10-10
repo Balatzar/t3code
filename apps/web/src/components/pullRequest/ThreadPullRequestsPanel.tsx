@@ -1,6 +1,8 @@
 import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
-import { detectSourceControlProviderFromRemoteUrl } from "@t3tools/shared/sourceControl";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import {
+  sourceControlClients,
+  UNKNOWN_SOURCE_CONTROL_CLIENT,
+} from "@t3tools/client-runtime/source-control-clients";
 import {
   resolveThreadPullRequestChains,
   visibleThreadPullRequests,
@@ -105,11 +107,12 @@ function LinkRow({
   const snapshot = link.snapshot;
   const open = snapshot === null || snapshot.state === "open";
   const watching = link.watch !== undefined;
+  // A link carries no host summary, so the host's own definition says what it can do.
+  const linkHostActions = (
+    sourceControlClients.findByChangeRequestUrl(link.url) ?? UNKNOWN_SOURCE_CONTROL_CLIENT
+  ).changeRequestActions;
   const actionEntry =
-    projectId !== null &&
-    snapshot !== null &&
-    snapshot.state !== "merged" &&
-    detectSourceControlProviderFromRemoteUrl(link.url)?.kind === "github"
+    projectId !== null && snapshot !== null && snapshot.state !== "merged"
       ? {
           environmentId: threadRef.environmentId,
           projectId,
@@ -246,7 +249,11 @@ function LinkRow({
         />
       </a>
       {actionEntry !== null ? (
-        <PullRequestSpeedActions entry={actionEntry} visible={speedMode} />
+        <PullRequestSpeedActions
+          entry={actionEntry}
+          hostActions={linkHostActions}
+          visible={speedMode}
+        />
       ) : null}
       {/* Out of the row's flow, so no row reserves a column for a button only the hovered one
           shows. It sits over the right end of the second line on the row's own hover color,

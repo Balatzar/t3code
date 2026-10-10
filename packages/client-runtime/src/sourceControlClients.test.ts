@@ -245,3 +245,17 @@ describe("project matching", () => {
     ).toBeNull();
   });
 });
+
+describe("change request actions", () => {
+  it("lists only what each host can do", () => {
+    expect([...sourceControlClients.get("bitbucket").changeRequestActions]).toEqual([
+      "merge",
+      "close",
+    ]);
+    expect(sourceControlClients.get("forgejo").changeRequestActions.has("ready")).toBe(false);
+    expect(sourceControlClients.get("azure-devops").changeRequestActions.has("update-branch")).toBe(
+      false,
+    );
+    expect(UNKNOWN_SOURCE_CONTROL_CLIENT.changeRequestActions.size).toBe(0);
+  });
+});
