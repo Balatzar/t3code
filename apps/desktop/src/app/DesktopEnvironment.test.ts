@@ -60,6 +60,7 @@ describe("DesktopEnvironment", () => {
       );
 
       assert.equal(environment.isDevelopment, true);
+      assert.equal(environment.displayName, "tes trois code (Dev)");
       assert.equal(environment.appDataDirectory, "/Users/alice/Library/Application Support");
       assert.equal(environment.baseDir, "/tmp/t3");
       assert.equal(environment.stateDir, "/tmp/t3/userdata");
@@ -112,11 +113,29 @@ describe("DesktopEnvironment", () => {
       );
 
       assert.equal(environment.isDevelopment, false);
+      assert.deepEqual(environment.branding, {
+        baseName: "tes trois code",
+        stageLabel: "Alpha",
+        displayName: "tes trois code",
+      });
+      assert.equal(environment.appUserModelId, "com.t3tools.t3code");
+      assert.equal(environment.userDataDirName, "t3code");
+      assert.equal(environment.legacyUserDataDirName, "T3 Code (Alpha)");
       assert.equal(environment.stateDir, "/tmp/t3/userdata");
       assert.equal(environment.logDir, "/tmp/t3/userdata/logs");
       assert.equal(environment.browserArtifactsDir, "/tmp/t3/userdata/browser-artifacts");
       assert.equal(environment.serverSettingsPath, "/tmp/t3/userdata/settings.json");
       assert.equal(environment.otlpProtocol, "http/json");
+    }),
+  );
+
+  it.effect("keeps the nightly label in the fork display name", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({
+        appVersion: "0.0.45-nightly.20261010.1",
+      });
+
+      assert.equal(environment.displayName, "tes trois code (Nightly)");
     }),
   );
 
