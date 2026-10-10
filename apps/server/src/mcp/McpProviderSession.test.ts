@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { withAgentDeviceEnvironment } from "./McpProviderSession.ts";
+import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { withAgentDeviceEnvironment, withThreadEnvironment } from "./McpProviderSession.ts";
 
 describe("device CLI environment", () => {
   it("preserves provider credentials and commands while routing devices to the owned daemon", () => {
@@ -26,5 +27,24 @@ describe("device CLI environment", () => {
     const environment = { PATH: "/usr/bin", PROVIDER_KEY: "fixture" };
     expect(withAgentDeviceEnvironment(environment, undefined)).toBe(environment);
     expect(withAgentDeviceEnvironment(environment, {})).toBe(environment);
+  });
+});
+
+describe("thread environment", () => {
+  it("names the environment and thread the provider process serves", () => {
+    const environment = withThreadEnvironment(
+      { PATH: "/usr/bin" },
+      { environmentId: EnvironmentId.make("env-1"), threadId: ThreadId.make("thread-1") },
+    );
+    expect(environment).toEqual({
+      PATH: "/usr/bin",
+      T3CODE_ENVIRONMENT_ID: "env-1",
+      T3CODE_THREAD_ID: "thread-1",
+    });
+  });
+
+  it("leaves the environment untouched without a session", () => {
+    const environment = { PATH: "/usr/bin" };
+    expect(withThreadEnvironment(environment, undefined)).toBe(environment);
   });
 });

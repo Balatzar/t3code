@@ -278,6 +278,20 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     }
 
     const unsubscribe = onMenuAction((action) => {
+      // Sent by the desktop shell for `t3code://threads/<env>/<thread>` links.
+      if (action.startsWith("open-thread:")) {
+        const [environmentId, threadId] = action
+          .slice("open-thread:".length)
+          .split("/")
+          .map((segment) => decodeURIComponent(segment));
+        if (environmentId && threadId) {
+          void navigate({
+            to: "/$environmentId/$threadId",
+            params: { environmentId, threadId },
+          });
+        }
+        return;
+      }
       if (action === "open-settings") {
         const isSettingsRoute = /^\/settings(\/|$)/.test(pathname);
         if (!isSettingsRoute) {

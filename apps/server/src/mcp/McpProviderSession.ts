@@ -34,6 +34,22 @@ export function withAgentDeviceEnvironment(
   };
 }
 
+/**
+ * Provider env tagged with the thread it serves. Hooks inherit it, so tools
+ * watching the agent (such as Vibe Island) can open `t3code://threads/<env>/<thread>`.
+ */
+export function withThreadEnvironment(
+  base: NodeJS.ProcessEnv,
+  config: Pick<McpProviderSessionConfig, "environmentId" | "threadId"> | undefined,
+): NodeJS.ProcessEnv {
+  if (!config) return base;
+  return {
+    ...base,
+    T3CODE_ENVIRONMENT_ID: config.environmentId,
+    T3CODE_THREAD_ID: config.threadId,
+  };
+}
+
 const sessionsByThread = new Map<ThreadId, McpProviderSessionConfig>();
 
 export function setMcpProviderSession(config: McpProviderSessionConfig): void {

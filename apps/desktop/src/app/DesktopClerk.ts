@@ -18,6 +18,8 @@ import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopAppIdentity from "./DesktopAppIdentity.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+import { parseDesktopThreadLink, threadLinkMenuAction } from "./DesktopThreadLink.ts";
+import { MENU_ACTION_CHANNEL } from "../ipc/channels.ts";
 
 declare const __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: string | undefined;
 
@@ -186,13 +188,47 @@ export const make = Effect.gen(function* () {
         );
         return true;
       };
+      const openThreadLink = (value: string | undefined) => {
+        const link = parseDesktopThreadLink(
+          value,
+          ElectronProtocol.getDesktopScheme(environment.isDevelopment),
+        );
+        if (link === null) return false;
+        void runPromise(
+          Effect.gen(function* () {
+            const mainWindow = yield* electronWindow.currentMainOrFirst;
+            if (Option.isNone(mainWindow)) return;
+            const window = mainWindow.value;
+            const send = () => {
+              if (!window.isDestroyed()) {
+                window.webContents.send(MENU_ACTION_CHANNEL, threadLinkMenuAction(link));
+              }
+            };
+            if (window.webContents.isLoadingMainFrame()) {
+              window.webContents.once("did-finish-load", send);
+            } else {
+              send();
+            }
+            yield* electronWindow.reveal(window);
+          }).pipe(
+            Effect.catchCause((cause) => Effect.logWarning("Could not open thread link", cause)),
+          ),
+        );
+        return true;
+      };
       const args = yield* HostProcessArguments;
       args.some((value) => startProviderAuthHandoff(value));
       yield* electronApp.on("open-url", (event: { preventDefault: () => void }, url: string) => {
-        if (startProviderAuthHandoff(url) || resumeProviderAuth(url)) event.preventDefault();
+        if (startProviderAuthHandoff(url) || resumeProviderAuth(url) || openThreadLink(url))
+          event.preventDefault();
       });
       yield* electronApp.on("second-instance", (_event: unknown, argv: readonly string[]) => {
-        if (argv?.some((value) => startProviderAuthHandoff(value) || resumeProviderAuth(value)))
+        if (
+          argv?.some(
+            (value) =>
+              startProviderAuthHandoff(value) || resumeProviderAuth(value) || openThreadLink(value),
+          )
+        )
           return;
         void runPromise(
           Effect.gen(function* () {
