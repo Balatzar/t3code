@@ -32,3 +32,27 @@ export function parseDesktopThreadLink(
 export function threadLinkMenuAction(link: DesktopThreadLink): string {
   return `${OPEN_THREAD_MENU_ACTION_PREFIX}${encodeURIComponent(link.environmentId)}/${encodeURIComponent(link.threadId)}`;
 }
+
+/**
+ * Vibe Island jump rules can only fill in the provider's session id:
+ * `t3code://vibe-island?session=<id>`. Built-in session keys carry the
+ * provider name as a prefix (`codex-<thread>`), which the lookup does not use.
+ */
+export function parseVibeIslandSessionLink(
+  value: string | undefined,
+  scheme: string,
+): string | null {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== `${scheme}:` || url.host !== "vibe-island") return null;
+  const session = url.searchParams
+    .get("session")
+    ?.trim()
+    .replace(/^(claude|codex)-/u, "");
+  return session ? session : null;
+}

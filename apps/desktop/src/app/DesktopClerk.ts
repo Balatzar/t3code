@@ -18,7 +18,12 @@ import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopAppIdentity from "./DesktopAppIdentity.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
-import { parseDesktopThreadLink, threadLinkMenuAction } from "./DesktopThreadLink.ts";
+import { findThreadForProviderSession } from "./DesktopProviderSessionLookup.ts";
+import {
+  parseDesktopThreadLink,
+  parseVibeIslandSessionLink,
+  threadLinkMenuAction,
+} from "./DesktopThreadLink.ts";
 import { MENU_ACTION_CHANNEL } from "../ipc/channels.ts";
 
 declare const __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: string | undefined;
@@ -188,17 +193,28 @@ export const make = Effect.gen(function* () {
         );
         return true;
       };
+      const resolveThreadLink = (value: string | undefined) => {
+        const scheme = ElectronProtocol.getDesktopScheme(environment.isDevelopment);
+        const link = parseDesktopThreadLink(value, scheme);
+        if (link !== null) return link;
+        const providerSessionId = parseVibeIslandSessionLink(value, scheme);
+        return providerSessionId === null
+          ? undefined
+          : findThreadForProviderSession(environment.stateDir, providerSessionId);
+      };
       const openThreadLink = (value: string | undefined) => {
-        const link = parseDesktopThreadLink(
-          value,
-          ElectronProtocol.getDesktopScheme(environment.isDevelopment),
-        );
-        if (link === null) return false;
+        const link = resolveThreadLink(value);
+        // A recognized link whose session is unknown still just raises the app.
+        if (link === undefined) return false;
         void runPromise(
           Effect.gen(function* () {
             const mainWindow = yield* electronWindow.currentMainOrFirst;
             if (Option.isNone(mainWindow)) return;
             const window = mainWindow.value;
+            if (link === null) {
+              yield* electronWindow.reveal(window);
+              return;
+            }
             const send = () => {
               if (!window.isDestroyed()) {
                 window.webContents.send(MENU_ACTION_CHANNEL, threadLinkMenuAction(link));

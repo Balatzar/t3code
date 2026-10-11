@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseDesktopThreadLink, threadLinkMenuAction } from "./DesktopThreadLink.ts";
+import {
+  parseDesktopThreadLink,
+  parseVibeIslandSessionLink,
+  threadLinkMenuAction,
+} from "./DesktopThreadLink.ts";
 
 describe("desktop thread links", () => {
   it("reads the environment and thread from a thread link", () => {
@@ -23,5 +27,16 @@ describe("desktop thread links", () => {
     expect(threadLinkMenuAction({ environmentId: "env 1", threadId: "thread/1" })).toBe(
       "open-thread:env%201/thread%2F1",
     );
+  });
+
+  it("reads the provider session from a Vibe Island link", () => {
+    expect(parseVibeIslandSessionLink("t3code://vibe-island?session=abc-1", "t3code")).toBe(
+      "abc-1",
+    );
+    expect(parseVibeIslandSessionLink("t3code://vibe-island?session=codex-01a1-2b", "t3code")).toBe(
+      "01a1-2b",
+    );
+    expect(parseVibeIslandSessionLink("t3code://vibe-island?session=", "t3code")).toBeNull();
+    expect(parseVibeIslandSessionLink("t3code://threads/env/thread", "t3code")).toBeNull();
   });
 });
