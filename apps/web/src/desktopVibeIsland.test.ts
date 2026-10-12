@@ -1,4 +1,12 @@
-import { EnvironmentId, ProjectId, ThreadId, TurnId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ProjectId,
+  ProviderThreadId,
+  RunId,
+  RuntimeRequestId,
+  ThreadId,
+} from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import { reconcileDesktopVibeIslandThreads } from "./desktopVibeIsland";
@@ -16,14 +24,13 @@ function thread() {
     title: "Check the remote thread",
     worktreePath: null,
     archivedAt: null,
-    hasPendingApprovals: false,
-    hasPendingUserInput: false,
-    session: { status: "running" as const },
-    latestTurn: {
-      turnId: TurnId.make("turn-1"),
-      state: "running" as const,
-      completedAt: null,
-    },
+    settledAt: null,
+    lineage: { relationshipToParent: null },
+    activeProviderThreadId: ProviderThreadId.make("provider-thread-1"),
+    pendingRuntimeRequest: null,
+    latestRunId: RunId.make("run-1"),
+    latestRunCompletedAt: null,
+    status: "running" as const,
   };
 }
 
@@ -70,12 +77,8 @@ describe("desktop Vibe Island remote threads", () => {
     );
     const completed = {
       ...current,
-      session: { status: "ready" as const },
-      latestTurn: {
-        ...current.latestTurn,
-        state: "completed" as const,
-        completedAt: "2026-10-12T11:59:59.000Z",
-      },
+      status: "completed" as const,
+      latestRunCompletedAt: DateTime.makeUnsafe("2026-10-12T11:59:59.000Z"),
     };
     const stopped = reconcileDesktopVibeIslandThreads(
       environmentId,
@@ -96,7 +99,7 @@ describe("desktop Vibe Island remote threads", () => {
     ).toEqual([]);
     const next = {
       ...current,
-      latestTurn: { ...current.latestTurn, turnId: TurnId.make("turn-2") },
+      latestRunId: RunId.make("run-2"),
     };
     expect(
       reconcileDesktopVibeIslandThreads(
@@ -113,18 +116,16 @@ describe("desktop Vibe Island remote threads", () => {
     const current = thread();
     const completed = {
       ...current,
-      session: { status: "ready" as const },
-      latestTurn: {
-        ...current.latestTurn,
-        state: "completed" as const,
-        completedAt: "2026-10-12T11:59:00.000Z",
-      },
+      activeProviderThreadId: null,
+      status: "completed" as const,
+      latestRunCompletedAt: DateTime.makeUnsafe("2026-10-12T11:59:00.000Z"),
     };
     const historic = {
       ...completed,
       id: ThreadId.make("historic"),
-      session: { status: "stopped" as const },
-      latestTurn: { ...completed.latestTurn, completedAt: "2026-10-12T11:54:59.000Z" },
+      activeProviderThreadId: current.activeProviderThreadId,
+      settledAt: DateTime.makeUnsafe("2026-10-12T11:54:59.000Z"),
+      latestRunCompletedAt: DateTime.makeUnsafe("2026-10-12T11:54:59.000Z"),
     };
     const restored = reconcileDesktopVibeIslandThreads(
       environmentId,
@@ -140,15 +141,25 @@ describe("desktop Vibe Island remote threads", () => {
     expect([...restored.threads.keys()]).toEqual([threadId]);
   });
 
+  it("keeps provider subagents out of the remote thread cards", () => {
+    const child = { ...thread(), lineage: { relationshipToParent: "subagent" as const } };
+    const restored = reconcileDesktopVibeIslandThreads(
+      environmentId,
+      projects,
+      [child],
+      new Map(),
+      nowMs,
+    );
+    expect(restored.events).toEqual([]);
+    expect(restored.threads.size).toBe(0);
+  });
+
   it("restores an attached idle session using the latest turn's completed state", () => {
     const current = thread();
     const idle = {
       ...current,
-      latestTurn: {
-        ...current.latestTurn,
-        state: "completed" as const,
-        completedAt: "2026-10-12T10:00:00.000Z",
-      },
+      status: "completed" as const,
+      latestRunCompletedAt: DateTime.makeUnsafe("2026-10-12T10:00:00.000Z"),
     };
     expect(
       reconcileDesktopVibeIslandThreads(
@@ -165,12 +176,9 @@ describe("desktop Vibe Island remote threads", () => {
     const current = thread();
     const selected = {
       ...current,
-      session: { status: "stopped" as const },
-      latestTurn: {
-        ...current.latestTurn,
-        state: "completed" as const,
-        completedAt: "2026-10-12T10:00:00.000Z",
-      },
+      activeProviderThreadId: null,
+      status: "completed" as const,
+      latestRunCompletedAt: DateTime.makeUnsafe("2026-10-12T10:00:00.000Z"),
     };
     expect(
       reconcileDesktopVibeIslandThreads(
@@ -185,7 +193,10 @@ describe("desktop Vibe Island remote threads", () => {
   });
 
   it("restores an approval and reports failures without waiting for provider hooks", () => {
-    const current = { ...thread(), hasPendingApprovals: true };
+    const current = {
+      ...thread(),
+      pendingRuntimeRequest: { id: RuntimeRequestId.make("approval-1") },
+    };
     const approval = reconcileDesktopVibeIslandThreads(
       environmentId,
       projects,
@@ -196,9 +207,8 @@ describe("desktop Vibe Island remote threads", () => {
     expect(approval.events.map(({ event }) => event)).toEqual(["SessionStart", "Notification"]);
     const failed = {
       ...current,
-      hasPendingApprovals: false,
-      session: { status: "error" as const },
-      latestTurn: { ...current.latestTurn, state: "error" as const },
+      pendingRuntimeRequest: null,
+      status: "failed" as const,
     };
     expect(
       reconcileDesktopVibeIslandThreads(
@@ -221,7 +231,9 @@ describe("desktop Vibe Island remote threads", () => {
       nowMs,
     );
     const remaining =
-      reason === "archived" ? [{ ...current, archivedAt: "2026-10-12T12:00:00.000Z" }] : [];
+      reason === "archived"
+        ? [{ ...current, archivedAt: DateTime.makeUnsafe("2026-10-12T12:00:00.000Z") }]
+        : [];
     const ended = reconcileDesktopVibeIslandThreads(
       environmentId,
       projects,

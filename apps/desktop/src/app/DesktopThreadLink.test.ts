@@ -5,7 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   parseDesktopThreadLink,
   parseVibeIslandSessionLink,
-  threadLinkMenuAction,
+  threadLinkUrl,
 } from "./DesktopThreadLink.ts";
 
 describe("desktop thread links", () => {
@@ -31,8 +31,8 @@ describe("desktop thread links", () => {
   });
 
   it("encodes the route for the renderer", () => {
-    expect(threadLinkMenuAction({ environmentId: "env 1", threadId: "thread/1" })).toBe(
-      "open-thread:env%201/thread%2F1",
+    expect(threadLinkUrl({ environmentId: "env 1", threadId: "thread/1" }, "t3code")).toBe(
+      "t3code://threads/env%201/thread%2F1",
     );
   });
 

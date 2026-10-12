@@ -1,10 +1,8 @@
 /**
  * External apps (Vibe Island, notifications) open a thread with
  * `t3code://threads/<environmentId>/<threadId>`, the same link the mobile app
- * handles. The renderer receives it as a menu action and routes to the thread.
+ * handles. The renderer receives it through the ready-aware desktop link queue.
  */
-export const OPEN_THREAD_MENU_ACTION_PREFIX = "open-thread:";
-
 export interface DesktopThreadLink {
   readonly environmentId: string;
   readonly threadId: string;
@@ -39,8 +37,8 @@ export function parseDesktopThreadLink(
   }
 }
 
-export function threadLinkMenuAction(link: DesktopThreadLink): string {
-  return `${OPEN_THREAD_MENU_ACTION_PREFIX}${encodeURIComponent(link.environmentId)}/${encodeURIComponent(link.threadId)}`;
+export function threadLinkUrl(link: DesktopThreadLink, scheme: string): string {
+  return `${scheme}://threads/${encodeURIComponent(link.environmentId)}/${encodeURIComponent(link.threadId)}`;
 }
 
 /**
