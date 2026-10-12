@@ -1,0 +1,8 @@
+{
+  "displayName": "T3 Code",
+  "bundleIdentifier": "com.t3tools.t3code",
+  "jumpRule": {
+    "method": "urlScheme",
+    "template": "t3code://vibe-island?session={session_id}&thread={raw_session_id}"
+  }
+}

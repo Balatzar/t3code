@@ -11,7 +11,7 @@ import {
   PreviewAutomationWaitForInput,
 } from "./previewAutomation.ts";
 import { SnapShotSource } from "./orchestration.ts";
-import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { EnvironmentId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { BrowserProfileId } from "./browserProfile.ts";
 import type {
   BrowserImportResult,
@@ -1121,6 +1121,22 @@ export const DesktopPreviewAutomationWaitForInputSchema = Schema.Struct({
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+export const DesktopVibeIslandEvent = Schema.Struct({
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+  cwd: TrimmedNonEmptyString.check(Schema.isMaxLength(4096)),
+  title: TrimmedNonEmptyString.check(Schema.isMaxLength(500)),
+  event: Schema.Literals([
+    "SessionStart",
+    "UserPromptSubmit",
+    "Stop",
+    "StopFailure",
+    "Notification",
+    "SessionEnd",
+  ]),
+});
+export type DesktopVibeIslandEvent = typeof DesktopVibeIslandEvent.Type;
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   /** Absolute path of a dropped or picked file; absent on desktop builds predating it. */
@@ -1128,6 +1144,7 @@ export interface DesktopBridge {
   /** The desktop client's OS platform, read from Electron's preload process. */
   getClientPlatform?: () => string;
   setNotificationBadge?: (badge: { count: number; image: string | null }) => Promise<void>;
+  sendVibeIslandEvent?: (event: DesktopVibeIslandEvent) => Promise<void>;
   onNotificationBadgeClear?: (listener: () => void) => () => void;
   onTrackpadScrollEnd?: (listener: () => void) => () => void;
   /**

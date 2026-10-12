@@ -21,12 +21,22 @@ export function parseDesktopThreadLink(
   } catch {
     return null;
   }
-  if (url.protocol !== `${scheme}:` || url.host !== "threads") return null;
-  const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
-  if (segments.length !== 2) return null;
-  const [environmentId, threadId] = segments.map((segment) => decodeURIComponent(segment));
-  if (!environmentId || !threadId) return null;
-  return { environmentId, threadId };
+  if (url.protocol !== `${scheme}:`) return null;
+  try {
+    // Custom T3 cards carry the remote environment and thread, URL-encoded by Vibe Island.
+    const segments =
+      url.host === "vibe-island"
+        ? (url.searchParams.get("thread") ?? "").split("/")
+        : url.host === "threads"
+          ? url.pathname.split("/").filter(Boolean).map(decodeURIComponent)
+          : [];
+    if (segments.length !== 2) return null;
+    const [environmentId, threadId] = segments;
+    if (!environmentId?.trim() || !threadId?.trim()) return null;
+    return { environmentId, threadId };
+  } catch {
+    return null;
+  }
 }
 
 export function threadLinkMenuAction(link: DesktopThreadLink): string {
