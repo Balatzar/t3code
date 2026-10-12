@@ -247,7 +247,7 @@ function RootRouteView() {
           {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
           {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
           {isElectron ? <DesktopVibeIslandCoordinator /> : null}
-          {primaryEnvironmentAuthenticated ? <DesktopWebLinkCoordinator /> : null}
+          {isElectron ? <DesktopWebLinkCoordinator /> : null}
           {isElectron ? <RunningThreadKeepAlive /> : null}
           <RelayClientInstallDialog />
           <ConnectOnboardingDialog />
