@@ -272,15 +272,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
   });
 
-  it("switches desktop packaging product names to nightly for nightly builds", () => {
+  it("keeps the fork packaging name across stable, nightly and preview builds", () => {
     assert.equal(resolveDesktopProductName("0.0.17"), "tes trois code");
-    assert.equal(
-      resolveDesktopProductName("0.0.17-nightly.20260413.42"),
-      "tes trois code (Nightly)",
-    );
+    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "tes trois code");
+    assert.equal(resolveDesktopProductName("0.0.46-preview.20261012.1"), "tes trois code");
   });
 
-  it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
+  it("keeps the fork macOS icon while other platforms use their release channel artwork", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {
       macIconPng: "assets/vibe/tes-trois-code-mac-icon.png",
       linuxIconPng: BRAND_ASSET_PATHS.productionLinuxIconPng,
@@ -288,7 +286,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
 
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17-nightly.20260413.42"), {
-      macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
+      macIconPng: "assets/vibe/tes-trois-code-mac-icon.png",
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
     });
